@@ -9,9 +9,9 @@ for _ in range(1000):
 
     # Take a random action
     action = env.action_space.sample()
-    observation, reward, done, truncated, info = env.step(action)
+    observation, reward, terminated, truncated, info = env.step(action)
 
-    if done:
+    if terminated:
         # Reset the environment if the episode is done
         observation = env.reset()
 
