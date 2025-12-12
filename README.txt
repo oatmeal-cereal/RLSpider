@@ -1,0 +1,6 @@
+This is what worked for me, a Windows user, at least
+To configure the environment, you will want to download Anaconda, then do the following commands:
+conda install conda-forge::mujoco-python
+conda install conda-forge::gymnasium
+conda install anaconda::imageio
+Then load the gymnasium ant test code into your IDE of choice, and select anaconda as the interpeter
