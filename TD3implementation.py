@@ -1,5 +1,8 @@
 import gymnasium as gym
 import torch
+print('torch', torch.__version__)
+print('cuda available', torch.cuda.is_available())
+print('torch cuda build', torch.version.cuda)
 import torch.nn as neural_network
 import torch.optim as optim
 import numpy as np
@@ -20,13 +23,15 @@ TARGET_NOISE_STD = 0.2
 TARGET_NOISE_CLIP = 0.5
 BUFFER_SIZE = 1000000
 TENSOR_TYPE = torch.float32 #float64 works as default but is slower
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+torch.set_float32_matmul_precision("high")  # safe speedup on recent PyTorch
 #FALL_PENALTY = -10.0  
 #MINIMUM_TORSO_Z = 0.275
 
 # ---- Training setup ----
-def get_tensor(tensor_elements):
-    #return torch.tensor(tensor_elements, dtype=TENSOR_TYPE)
-    return torch.from_numpy(np.array(tensor_elements)).to(dtype=TENSOR_TYPE)
+def get_tensor(x, device=DEVICE):
+    arr = np.asarray(x, dtype=np.float32)
+    return torch.from_numpy(arr).to(device=device, dtype=TENSOR_TYPE)
 
 
 class ReplayBuffer:
@@ -117,7 +122,7 @@ def get_target_q(reward, next_state, is_done, actor_target, critic_target1, crit
     with torch.no_grad(): #don't store gradients for efficiency
         next_action = actor_target(next_state)
         
-        random_noise = torch.randn(next_action.shape) * noise_std  
+        random_noise = torch.randn_like(next_action) * noise_std
         noise = torch.clamp(random_noise, -noise_clip, noise_clip)
 
         next_action = torch.clamp(next_action + noise, -actor_target.max_act_size, actor_target.max_act_size)
@@ -164,12 +169,12 @@ observation_space_size = env.observation_space.shape[0]
 action_space_size = env.action_space.shape[0]
 max_act_size = env.action_space.high[0]
 
-actor = Actor(observation_space_size, action_space_size, max_act_size)
-actor_target = Actor(observation_space_size, action_space_size, max_act_size)
-critic1 = Critic(observation_space_size, action_space_size)
-critic2 = Critic(observation_space_size, action_space_size)
-critic1_target = Critic(observation_space_size, action_space_size)
-critic2_target = Critic(observation_space_size, action_space_size)
+actor = Actor(observation_space_size, action_space_size, max_act_size).to(DEVICE)
+actor_target = Actor(observation_space_size, action_space_size, max_act_size).to(DEVICE)
+critic1 = Critic(observation_space_size, action_space_size).to(DEVICE)
+critic2 = Critic(observation_space_size, action_space_size).to(DEVICE)
+critic1_target = Critic(observation_space_size, action_space_size).to(DEVICE)
+critic2_target = Critic(observation_space_size, action_space_size).to(DEVICE)
 
 actor_target.load_state_dict(actor.state_dict())
 critic1_target.load_state_dict(critic1.state_dict())
@@ -210,7 +215,7 @@ run_rendered(actor)
 # ---- training ----
 
 start_time = datetime.now()
-print("Training start time: " + str(start_time))
+print(f"Training start time: {start_time} | device: {DEVICE}")
 
 for episode in range(EPISODES_NUMBER):
     state = env.reset()[0]
