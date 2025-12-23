@@ -1,16 +1,19 @@
 from collections import deque
 import random
+import copy
 
 import gymnasium as gym
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.nn.utils.clip_grad as clip_grad
 from torch.distributions import Normal
 
 
 ALPHA = 0.2
 GAMMA = 0.99
+POLYAK = 0.9
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -68,6 +71,7 @@ class Agent(nn.Module):
             nn.Linear(state_dim, 21),
             nn.ReLU(),
             nn.Linear(21, action_dim * 2),
+            nn.Softmax()
         )
 
         self.q1 = QNetwork(state_dim, action_dim).to(device)
@@ -75,6 +79,9 @@ class Agent(nn.Module):
         self.q1_optimizer = optim.Adam(self.q1.parameters())
         self.q2_optimizer = optim.Adam(self.q2.parameters())
         self.policy_optimizer = optim.Adam(self.policy.parameters())
+        #separate target q-networks, initialised with the same parameters, but will eventually be different
+        self.qtarget1 = copy.deepcopy(self.q1).to(device)
+        self.qtarget2 = copy.deepcopy(self.q2).to(device)
 
 
     def get_policy_mean_stds(self, state):
@@ -88,24 +95,40 @@ class Agent(nn.Module):
     def select_policy_action(self, state):
         with torch.no_grad():
             means, stds, _ = self.get_policy_mean_stds(state.unsqueeze(0))
+            #print(means[0][0], stds[0][0])
             action = Normal(means, stds).sample()
             action = torch.tanh(action)
         return action.squeeze()
 
 
-    def update_policy(self, states):
+    def update_policy(self, states, rewards, next_states):
         states = torch.from_numpy(states).float().to(device)
+        rewards = torch.from_numpy(rewards).float().to(device)
+        next_states = torch.from_numpy(next_states).float().to(device)
         means, stds, _ = self.get_policy_mean_stds(states)
 
         dist = Normal(means, stds)
-        actions = torch.tanh(dist.rsample())
-        log_probs = dist.log_prob(actions).sum(dim=1, keepdim=True)
+        sampled_actions = dist.rsample()
+        log_probs = dist.log_prob(sampled_actions).sum(dim=1, keepdim=True)
 
-        q1_val = self.q1(states, actions)
-        q2_val = self.q2(states, actions)
+        q1_val = self.qtarget1(states, sampled_actions)
+        q2_val = self.qtarget2(states, sampled_actions)
         q_min = torch.min(q1_val, q2_val)
+        
+        #treating the q-network as a value network by setting action values to 0
+        v1_s_val = self.q1(states, torch.from_numpy(np.zeros((len(states), 8))).float())
+        v2_s_val = self.q2(states, torch.from_numpy(np.zeros((len(states), 8))).float())
+        
+        v1_s_next_val = self.q1(next_states, torch.from_numpy(np.zeros((len(states), 8))).float())
+        v2_s_next_val = self.q2(next_states, torch.from_numpy(np.zeros((len(states), 8))).float())
+        
+        v_s_val_min = torch.min(v1_s_val, v2_s_val)
+        v_s_next_val_min = torch.min(v1_s_next_val, v2_s_next_val)
+        
+        advantage = torch.add(rewards, torch.subtract(torch.multiply(v_s_next_val_min, GAMMA), v_s_val_min))
 
-        policy_loss = (ALPHA * log_probs - q_min).mean()
+        #policy_loss = (ALPHA * log_probs - q_min).mean()
+        policy_loss = (((ALPHA - advantage) * log_probs) - q_min).mean()
 
         self.policy_optimizer.zero_grad()
         policy_loss.backward()
@@ -134,6 +157,10 @@ class Agent(nn.Module):
             q_min = torch.min(q1_new, q2_new)
 
             targets = rewards + GAMMA * (1 - dones) * (q_min - ALPHA * log_probs)
+            
+            #update target q network parameters using reparameterization trick
+            for target_param, param in zip(self.qtarget1.parameters(), self.q1.parameters()):
+                target_param.data.copy_((POLYAK * target_param) - ((1 - POLYAK) * param))
 
         q1_pred = self.q1(states, actions)
         q1_loss = nn.functional.mse_loss(q1_pred, targets)
@@ -150,8 +177,8 @@ class Agent(nn.Module):
         return q1_loss.item(), q2_loss.item()
 
 
-env = gym.make("Ant-v5", healthy_z_range=(0.3, 3))
-# env = gym.make("Ant-v5", render_mode="human", healthy_z_range=(0.3, 3))
+#env = gym.make("Ant-v5", healthy_z_range=(0.3, 3))
+env = gym.make("Ant-v5", render_mode="human", healthy_z_range=(0.3, 3))
 
 buffer = ReplayBuffer(capacity=1_000_000)
 agent = Agent()
@@ -179,7 +206,7 @@ for i in range(num_episodes):
         if len(buffer) > batch_size:
             batch = buffer.sample(batch_size)
             agent.update_q_functions(batch)
-            agent.update_policy(batch[0])
+            agent.update_policy(batch[0], batch[2], batch[3])
 
         if done:
             state, _ = env.reset()
