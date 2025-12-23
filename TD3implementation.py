@@ -1,5 +1,6 @@
 import gymnasium as gym
 import torch
+import matplotlib.pyplot as plt
 print('torch', torch.__version__)
 print('cuda available', torch.cuda.is_available())
 print('torch cuda build', torch.version.cuda)
@@ -216,6 +217,7 @@ run_rendered(actor)
 
 start_time = datetime.now()
 print(f"Training start time: {start_time} | device: {DEVICE}")
+episode_rewards_over_time = []
 
 for episode in range(EPISODES_NUMBER):
     state = env.reset()[0]
@@ -256,12 +258,25 @@ for episode in range(EPISODES_NUMBER):
         if is_done:
             break
 
-    print("Episode Number: " + str(episode+1) + " Reward = " + str(episode_reward))
+    episode_rewards_over_time.append(episode_reward)
+    print(f"Episode Number: {episode + 1} | Reward: {episode_reward}")
 
 end_time = datetime.now()
 print("Training start time: " + str(start_time))
 print("Training end time: " + str(end_time))
 print("Total training time: " + str(end_time - start_time))
+
+plt.figure(figsize=(12,6))
+plt.plot(episode_rewards_over_time, label='Episode Reward')
+window = 12
+if len(episode_rewards_over_time) >= window:
+    smoothed = np.convolve(episode_rewards_over_time, np.ones(window) / window, mode="valid")
+    plt.plot(range(window - 1, len(episode_rewards_over_time)), smoothed, label=f"{window}-ep moving avg")
+plt.xlabel('Episode')
+plt.ylabel('Reward')
+plt.title('Episode Rewards Over Time')
+plt.legend()
+plt.show()
 
 #---- View After Training (With Rendering) ----
 
