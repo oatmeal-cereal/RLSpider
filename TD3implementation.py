@@ -11,9 +11,9 @@ import random
 from datetime import datetime
 from collections import deque
 
-EPISODES_NUMBER = 300
-MAXIMUM_STEPS = 1000
-BATCH_SIZE = 512
+EPISODES_NUMBER = 2000
+MAXIMUM_STEPS = 500
+BATCH_SIZE = 256
 GAMMA = 0.99
 TAU = 0.005
 ACTOR_LEARNING_RATE = 0.001
@@ -183,7 +183,7 @@ critic2_target.load_state_dict(critic2.state_dict())
 
 actor_optimiser = optim.Adam(actor.parameters(), lr=ACTOR_LEARNING_RATE)
 critic1_optimiser = optim.Adam(critic1.parameters(), lr=CRITIC_LEARNING_RATE)
-critic2_optiniser = optim.Adam(critic2.parameters(), lr=CRITIC_LEARNING_RATE)
+critic2_optimiser = optim.Adam(critic2.parameters(), lr=CRITIC_LEARNING_RATE)
 
 replay_buffer = ReplayBuffer(BUFFER_SIZE)
 total_step_count = 0
@@ -211,7 +211,7 @@ def run_rendered(actor):
     rendered_env.close()
 
 print("Showing render of untrained model...")
-run_rendered(actor)
+# run_rendered(actor)
 
 # ---- training ----
 
@@ -247,7 +247,7 @@ for episode in range(EPISODES_NUMBER):
         if replay_buffer.buffer_size() > BATCH_SIZE:
             batch = replay_buffer.sample_batch(BATCH_SIZE)
 
-            update_critics(critic1, critic2, critic1_target, critic2_target, actor_target,critic1_optimiser, critic2_optiniser, batch)
+            update_critics(critic1, critic2, critic1_target, critic2_target, actor_target,critic1_optimiser, critic2_optimiser, batch)
 
             if total_step_count % POLICY_DELAY == 0:
                 update_actor(actor, critic1, actor_optimiser, batch)
