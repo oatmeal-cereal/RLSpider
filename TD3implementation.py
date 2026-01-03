@@ -32,7 +32,7 @@ LEARNING_STARTS = 10000
 UPDATES_PER_STEP = 1
 VEC_MODE = "async"  # "async" or "sync"
 TRAIN_EVERY = 4          # do training once every N vector-steps
-UPDATES_PER_TRAIN = 1    # number of critic updates per train event (start with 1)
+UPDATES_PER_TRAIN = 1    # number of critic updates per train event
 #FALL_PENALTY = -10.0
 #MINIMUM_TORSO_Z = 0.275
 
@@ -331,7 +331,9 @@ def main():
 
     entry = ""
     while entry != "e":
-        entry = input("enter \"e\" to exit, or anything else to view the trained model\n")
+        entry = input("enter \"e\" to exit, p to view the graph, or anything else to view the trained model\n")
+        if entry == "p":
+            plt.show()
         if entry != "e":
             run_rendered(actor)
 
