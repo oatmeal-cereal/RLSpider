@@ -30,9 +30,8 @@ BUFFER_SIZE = 1000000
 NUM_ENVS = 8
 LEARNING_STARTS = 20000
 UPDATES_PER_STEP = 1
-VEC_MODE = "async"  # "async" or "sync"
-TRAIN_EVERY = 4          # do training once every N vector-steps
-UPDATES_PER_TRAIN = 2    # number of critic updates per train event
+TRAIN_EVERY = 4 # do training once every N vector-steps
+UPDATES_PER_TRAIN = 2 # number of critic updates per train event
 #FALL_PENALTY = -10.0
 #MINIMUM_TORSO_Z = 0.275
 
@@ -126,13 +125,6 @@ def select_action_batch(actor, states_np, noise_std):
 
     return np.clip(actions, -actor.max_act_size, actor.max_act_size)
 
-def select_action(actor, state, noise_std):
-    state_tensor = get_tensor(state).unsqueeze(0)
-    action = action_from_actor(actor, state_tensor)
-    
-    action = action + np.random.normal(0, noise_std, size=action.shape) # add random noise to every element of action for exploration
-    return np.clip(action, -actor.max_act_size, actor.max_act_size) # keep action in accepted limits of environment
-
 # move target towards source
 def soft_update(target, source, tau):
     target_params = list(target.parameters())
@@ -194,6 +186,7 @@ def make_env():
     def thunk():
         return gym.make("Ant-v5", render_mode=None)
     return thunk
+
 # ---- run once before training, with rendering ----
 def run_rendered(actor):
     rendered_env = gym.make("Ant-v5", render_mode="human")
@@ -221,10 +214,7 @@ def main():
     print('cuda available', torch.cuda.is_available())
     print('torch cuda build', torch.version.cuda)
 
-    if VEC_MODE == "async":
-        vec_env = gym.vector.AsyncVectorEnv([make_env() for _ in range(NUM_ENVS)])
-    else:
-        vec_env = gym.vector.SyncVectorEnv([make_env() for _ in range(NUM_ENVS)])
+    vec_env = gym.vector.AsyncVectorEnv([make_env() for _ in range(NUM_ENVS)])
 
     observation_space_size = vec_env.single_observation_space.shape[0]
     action_space_size = vec_env.single_action_space.shape[0]
@@ -283,7 +273,7 @@ def main():
             if now - last_t >= 5.0:
                 steps_done = total_step_count - last_steps
                 sps = steps_done / (now - last_t)
-                print(f"throughput: {sps:.0f} env-steps/s | mode={VEC_MODE} | num_envs={NUM_ENVS} | buffer={replay_buffer.buffer_size()}")
+                print(f"throughput: {sps:.0f} env-steps/s | num_envs={NUM_ENVS} | buffer={replay_buffer.buffer_size()}")
                 last_t = now
                 last_steps = total_step_count
 
@@ -334,7 +324,7 @@ def main():
         entry = input("enter \"e\" to exit, p to view the graph, or anything else to view the trained model\n")
         if entry == "p":
             plt.show()
-        if entry != "e":
+        if entry == "e":
             run_rendered(actor)
 
     vec_env.close()
