@@ -14,13 +14,13 @@ TENSOR_TYPE = torch.float32 #float64 works as default but is slower
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.set_float32_matmul_precision("high")  # safe speedup on recent PyTorch
 
-EPISODES_NUMBER = 2000
-MAXIMUM_STEPS = 500
+EPISODES_NUMBER = 3000
+MAXIMUM_STEPS = 1000
 BATCH_SIZE = 256
 GAMMA = 0.99
 TAU = 0.005
-ACTOR_LEARNING_RATE = 0.001
-CRITIC_LEARNING_RATE = 0.001
+ACTOR_LEARNING_RATE = 3e-4
+CRITIC_LEARNING_RATE = 3e-4
 POLICY_DELAY = 2
 NOISE_STD = 0.1
 TARGET_NOISE_STD = 0.2
@@ -28,11 +28,11 @@ TARGET_NOISE_CLIP = 0.5
 BUFFER_SIZE = 1000000
 
 NUM_ENVS = 8
-LEARNING_STARTS = 10000
+LEARNING_STARTS = 20000
 UPDATES_PER_STEP = 1
 VEC_MODE = "async"  # "async" or "sync"
 TRAIN_EVERY = 4          # do training once every N vector-steps
-UPDATES_PER_TRAIN = 1    # number of critic updates per train event
+UPDATES_PER_TRAIN = 2    # number of critic updates per train event
 #FALL_PENALTY = -10.0
 #MINIMUM_TORSO_Z = 0.275
 
