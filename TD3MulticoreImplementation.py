@@ -4,9 +4,7 @@ import matplotlib.pyplot as plt
 import torch.nn as neural_network
 import torch.optim as optim
 import numpy as np
-import random
 from datetime import datetime
-from collections import deque
 import multiprocessing as mp
 import time
 
@@ -57,26 +55,26 @@ class ReplayBuffer:
 
     def store_batch(self, states, actions, rewards, next_states, dones):
         n = states.shape[0]
-        idxs = (np.arange(n) + self.ptr) % self.max_size
+        indexes = (np.arange(n) + self.ptr) % self.max_size
 
-        self.obs[idxs] = states
-        self.acts[idxs] = actions
-        self.rews[idxs, 0] = rewards
-        self.next_obs[idxs] = next_states
-        self.dones[idxs, 0] = dones.astype(np.float32)
+        self.obs[indexes] = states
+        self.acts[indexes] = actions
+        self.rews[indexes, 0] = rewards
+        self.next_obs[indexes] = next_states
+        self.dones[indexes, 0] = dones.astype(np.float32)
 
         self.ptr = (self.ptr + n) % self.max_size
         self.size = min(self.size + n, self.max_size)
     
     def sample_batch(self, batch_size):
-        idxs = np.random.randint(0, self.size, size=batch_size)
+        indexes = np.random.randint(0, self.size, size=batch_size)
 
         return (
-            get_tensor(self.obs[idxs]),
-            get_tensor(self.acts[idxs]),
-            get_tensor(self.rews[idxs]),
-            get_tensor(self.next_obs[idxs]),
-            get_tensor(self.dones[idxs]),
+            get_tensor(self.obs[indexes]),
+            get_tensor(self.acts[indexes]),
+            get_tensor(self.rews[indexes]),
+            get_tensor(self.next_obs[indexes]),
+            get_tensor(self.dones[indexes]),
         )
 
     def buffer_size(self):
@@ -134,7 +132,7 @@ def soft_update(target, source, tau):
         target_params[i].data = tau * source_params[i].data + (1 - tau) * target_params[i].data
 
 def get_target_q(reward, next_state, is_done, actor_target, critic_target1, critic_target2, gamma, noise_std, noise_clip):
-    with torch.no_grad(): #don't store gradients for efficiency
+    with torch.no_grad(): # don't store gradients for efficiency
         next_action = actor_target(next_state)
         
         random_noise = torch.randn_like(next_action) * noise_std
@@ -209,6 +207,7 @@ def run_rendered(actor):
 
     rendered_env.close()
 
+# ---- Windows AsyncVectorEnv uses multiprocessing, so the code needs to be inside main() and guarded by if __name__ == "__main__": to prevent recursive spawning of processes ----
 def main():
     print('torch', torch.__version__)
     print('cuda available', torch.cuda.is_available())
@@ -240,7 +239,7 @@ def main():
 
 
     print("Showing render of untrained model...")
-    # run_rendered(actor)
+    run_rendered(actor)
 
     # ---- training ----
 
@@ -321,10 +320,8 @@ def main():
 
     entry = ""
     while entry != "e":
-        entry = input("enter \"e\" to exit, p to view the graph, or anything else to view the trained model\n")
-        if entry == "p":
-            plt.show()
-        if entry == "e":
+        entry = input("enter \"e\" to exit, or anything else to view the trained model\n")
+        if entry != "e":
             run_rendered(actor)
 
     vec_env.close()
